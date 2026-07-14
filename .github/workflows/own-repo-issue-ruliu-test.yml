@@ -38,6 +38,10 @@ jobs:
 
               content = (
                   "### GitHub 新增Issue测试\n\n"
+                  f"**#{issue['number']} {issue['title']}**\n\n"
+                  f"作者: {issue['user']['login']}\n\n"
+                  f"标签: {labels}\n\n"
+                  f"链接: {issue['html_url']}"
               )
 
           header = {}
