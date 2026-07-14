@@ -37,12 +37,7 @@ jobs:
               labels = ", ".join(label["name"] for label in issue.get("labels", [])) or "无"
 
               content = (
-                  "### GitHub 新 Issue\n\n"
-                  f"仓库: {os.environ['REPOSITORY']}\n\n"
-                  f"**#{issue['number']} {issue['title']}**\n\n"
-                  f"作者: {issue['user']['login']}\n\n"
-                  f"标签: {labels}\n\n"
-                  f"链接: {issue['html_url']}"
+                  "### GitHub 新 Issue测试\n\n"
               )
 
           header = {}
