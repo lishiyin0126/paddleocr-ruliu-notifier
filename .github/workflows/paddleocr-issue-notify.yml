@@ -1,0 +1,161 @@
+name: PaddleOCR Issue Notify
+
+on:
+  schedule:
+    # GitHub Actions uses UTC. This runs every 10 minutes.
+    - cron: "3/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout this repository
+        uses: actions/checkout@v4
+
+      - name: Check PaddleOCR issues and notify RuLiu
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RULIU_WEBHOOK: ${{ secrets.RULIU_WEBHOOK }}
+          RULIU_GROUP_ID: ${{ secrets.RULIU_GROUP_ID }}
+        run: |
+          mkdir -p state
+
+          python <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+          import urllib.error
+          import urllib.request
+
+          repo = "PaddlePaddle/PaddleOCR"
+          state_file = pathlib.Path("state/paddleocr_issue_state.json")
+
+          def read_json(path):
+              if not path.exists():
+                  return None
+              return json.loads(path.read_text(encoding="utf-8"))
+
+          def write_json(path, value):
+              path.write_text(
+                  json.dumps(value, ensure_ascii=False, indent=2) + "\n",
+                  encoding="utf-8",
+              )
+
+          def github_get(url):
+              req = urllib.request.Request(
+                  url,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                      "User-Agent": "paddleocr-ruliu-notifier",
+                  },
+              )
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  return json.loads(resp.read().decode("utf-8"))
+
+          def send_ruliu_markdown(content):
+              payload = {
+                  "message": {
+                      "header": {
+                          "toid": [int(os.environ["RULIU_GROUP_ID"])]
+                      },
+                      "body": [
+                          {
+                              "type": "MD",
+                              "content": content
+                          }
+                      ]
+                  }
+              }
+
+              req = urllib.request.Request(
+                  os.environ["RULIU_WEBHOOK"],
+                  data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                  headers={"Content-Type": "application/json;charset=utf-8"},
+                  method="POST",
+              )
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  body = resp.read().decode("utf-8", errors="replace")
+                  print(f"RuLiu response: HTTP {resp.status} {body}")
+
+          url = (
+              f"https://api.github.com/repos/{repo}/issues"
+              "?state=open&sort=created&direction=desc&per_page=30"
+          )
+
+          try:
+              items = github_get(url)
+          except urllib.error.HTTPError as exc:
+              print(exc.read().decode("utf-8", errors="replace"))
+              raise
+
+          issues = [item for item in items if "pull_request" not in item]
+
+          if not issues:
+              print("No open issues found.")
+              sys.exit(0)
+
+          newest_issue_number = max(issue["number"] for issue in issues)
+          state = read_json(state_file)
+
+          if state is None:
+              write_json(
+                  state_file,
+                  {
+                      "last_seen_issue_number": newest_issue_number,
+                      "initialized_without_sending_history": True,
+                  },
+              )
+              print(
+                  "First run: initialized state only. "
+                  "Historical issues were not sent."
+              )
+              sys.exit(0)
+
+          last_seen = int(state.get("last_seen_issue_number", 0))
+          new_issues = [issue for issue in issues if issue["number"] > last_seen]
+          new_issues.sort(key=lambda issue: issue["number"])
+
+          if not new_issues:
+              print("No new issues.")
+          else:
+              for issue in new_issues:
+                  labels = ", ".join(
+                      label["name"] for label in issue.get("labels", [])
+                  ) or "无"
+
+                  content = (
+                      "### PaddleOCR 新 Issue\n"
+                      f"**#{issue['number']} {issue['title']}**\n\n"
+                      f"作者: {issue['user']['login']}\n\n"
+                      f"标签: {labels}\n\n"
+                      f"创建时间: {issue['created_at']}\n\n"
+                      f"[打开 Issue]({issue['html_url']})"
+                  )
+                  send_ruliu_markdown(content)
+
+          write_json(
+              state_file,
+              {
+                  "last_seen_issue_number": newest_issue_number,
+                  "initialized_without_sending_history": state.get(
+                      "initialized_without_sending_history",
+                      True,
+                  ),
+              },
+          )
+          PY
+
+      - name: Save issue state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/paddleocr_issue_state.json
+          git diff --cached --quiet || git commit -m "Update PaddleOCR issue state"
+          git push
