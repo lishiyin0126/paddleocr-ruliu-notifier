@@ -37,7 +37,7 @@ jobs:
               labels = ", ".join(label["name"] for label in issue.get("labels", [])) or "无"
 
               content = (
-                  "### GitHub 新 Issue测试\n\n"
+                  "### GitHub 新增Issue测试\n\n"
               )
 
           header = {}
