@@ -3,7 +3,7 @@ name: PaddleOCR Issue Notify
 on:
   schedule:
     # GitHub Actions uses UTC. This runs every 10 minutes.
-    - cron: "*/10 * * * *"
+    - cron: "*/1 * * * *"
   workflow_dispatch:
 
 permissions:
