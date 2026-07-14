@@ -24,6 +24,7 @@ jobs:
           import json
           import os
           import urllib.error
+          import urllib.parse
           import urllib.request
 
           if os.environ["EVENT_NAME"] == "workflow_dispatch":
@@ -61,8 +62,21 @@ jobs:
               }
           }
 
+          webhook = os.environ["RULIU_WEBHOOK"].strip()
+          parsed_webhook = urllib.parse.urlparse(webhook)
+          if parsed_webhook.scheme not in {"http", "https"} or not parsed_webhook.netloc:
+              raise SystemExit(
+                  "RULIU_WEBHOOK must be a complete URL, such as "
+                  "https://example.com/path?access_token=xxx"
+              )
+
+          print(
+              "Sending RuLiu request to "
+              f"{parsed_webhook.scheme}://{parsed_webhook.netloc}{parsed_webhook.path}"
+          )
+
           req = urllib.request.Request(
-              os.environ["RULIU_WEBHOOK"],
+              webhook,
               data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
               headers={"Content-Type": "application/json;charset=utf-8"},
               method="POST",
@@ -75,4 +89,9 @@ jobs:
           except urllib.error.HTTPError as exc:
               print(exc.read().decode("utf-8", errors="replace"))
               raise
+          except urllib.error.URLError as exc:
+              raise SystemExit(
+                  "Could not connect to RULIU_WEBHOOK. Check whether the "
+                  f"domain is correct and publicly resolvable from GitHub Actions: {exc}"
+              )
           PY
