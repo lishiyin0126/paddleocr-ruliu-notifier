@@ -37,10 +37,11 @@ jobs:
               labels = ", ".join(label["name"] for label in issue.get("labels", [])) or "无"
 
               content = (
-                  "### GitHub 新增Issue测试\n\n"
+                  "### PaddleOCR 新 Issue\n\n"
                   f"**#{issue['number']} {issue['title']}**\n\n"
                   f"作者: {issue['user']['login']}\n\n"
                   f"标签: {labels}\n\n"
+                  f"创建时间: {issue['created_at']}\n\n"
                   f"链接: {issue['html_url']}"
               )
 
