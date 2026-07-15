@@ -136,7 +136,7 @@ jobs:
                       f"作者: {issue['user']['login']}\n\n"
                       f"标签: {labels}\n\n"
                       f"创建时间: {issue['created_at']}\n\n"
-                      f"[打开 Issue]({issue['html_url']})"
+                      f"链接:{issue['html_url']}"
                   )
                   send_ruliu_markdown(content)
 
